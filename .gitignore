@@ -32,9 +32,12 @@ build/
 
 ### VS Code ###
 .vscode/
-/src/main/resources/application.properties
+
+
+### Other ###
 /notes.h2.mv.db
 /src/main/resources/META-INF/additional-spring-configuration-metadata.json
 /.mvn/wrapper/maven-wrapper.properties
 /mvnw
 /mvnw.cmd
+/src/main/resources/application.properties
