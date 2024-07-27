@@ -9,20 +9,23 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import ru.l3xu5.notes.components.BotCommands;
-import ru.l3xu5.notes.components.Buttons;
+import ru.l3xu5.notes.components.ContextManager;
 import ru.l3xu5.notes.config.BotConfig;
+
+import static ru.l3xu5.notes.components.GeneralBotCommands.LIST_OF_COMMANDS;
 
 @Slf4j
 @Component
-public class TelegramBot extends TelegramLongPollingBot implements BotCommands {
+public class TelegramBot extends TelegramLongPollingBot {
     final BotConfig config;
     final UserRepository users;
+    final ContextManager contextManager;
 
-    public TelegramBot(@NonNull BotConfig config, @NonNull UserRepository users) {
+    public TelegramBot(@NonNull BotConfig config, @NonNull UserRepository users, ContextManager contextManager) {
         super(config.getToken());
         this.config = config;
         this.users = users;
+        this.contextManager = contextManager;
         try {
             this.execute(new SetMyCommands(LIST_OF_COMMANDS, new BotCommandScopeDefault(), null));
         } catch (TelegramApiException e) {
@@ -32,57 +35,15 @@ public class TelegramBot extends TelegramLongPollingBot implements BotCommands {
 
     @Override
     public void onUpdateReceived(@NonNull Update update) {
-        if (update.hasMessage() && update.getMessage().hasText()) {
-            processMessage(update.getMessage().getText(), update.getMessage().getChatId());
-        } else if (update.hasCallbackQuery()) {
-            processMessage(update.getCallbackQuery().getData(), update.getCallbackQuery().getMessage().getChatId());
-        }
-    }
-
-    private void processMessage(String text, long chatId) {
-        switch (text) {
-            case "/start":
-                startBot(chatId);
-                break;
-            case "/help":
-                sendHelp(chatId);
-                break;
-            default:
-                log.info("Unknown message: {}", text);
-        }
-    }
-
-    private void sendHelp(long chatId) {
-        final SendMessage message = new SendMessage();
-        message.setChatId(chatId);
-        message.setText(HELP_TEXT);
+        SendMessage message = contextManager.processUpdate(update);
         try {
             execute(message);
-            log.info("Help message was sent.");
+            log.info("Message {} was sent to {}.", message.getText(), message.getChatId());
         } catch (TelegramApiException e) {
-            log.error("{} while replying to /help", e.getMessage());
+            log.error("{} while sending message {} to {}", e.getMessage(), message.getText(), message.getChatId());
         }
     }
 
-    private void startBot(long chatId) {
-        final SendMessage message = new SendMessage();
-        message.setChatId(chatId);
-        message.setReplyMarkup(Buttons.inlineMarkup());
-        if (users.existsById(chatId)) {
-            message.setText("Hello!\nYou are already registered.");
-            log.info("Existed user used /start");
-        } else {
-            message.setText("Hello!\nWelcome to Notes.");
-            log.info("New user used /start");
-            users.save(new User(chatId));
-        }
-        try {
-            execute(message);
-            log.info("/start message was sent");
-        } catch (TelegramApiException e) {
-            log.error("{} while replying to /start", e.getMessage());
-        }
-    }
 
     @Override
     public String getBotUsername() {
